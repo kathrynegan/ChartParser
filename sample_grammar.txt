@@ -1,0 +1,16 @@
+S --> NP VP
+NP --> DT NBAR
+NP --> NS
+NP --> PN
+NBAR --> N
+NBAR --> NBAR PP
+NBAR --> NS
+NBAR --> ADJ NBAR
+VP --> ADV VP
+VP --> V
+VP --> V NP
+VP --> V NP NP
+VP --> V NP PP
+VP --> AUX VP
+VP --> VP PP
+PP --> P NP

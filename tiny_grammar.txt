@@ -1,0 +1,5 @@
+S --> NP VP
+NP --> DT N
+NP --> PN
+VP --> V
+VP --> V NP
