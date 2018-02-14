@@ -26,23 +26,126 @@ import re
 import copy
 
 
-lexicon = {}        # maps words to part(s) of speech
-grammar = {}        # stores rules, organized by first terminal in rule
-pos_set = set()       # stores parts of speech
+class Grammar:
+
+    def __init__(self):
+        self.grammar = {}
 
 
-# Returns the input as a lower case,
-# tokenized list of words
-def process_input():
-    punc = re.compile(r'[\.,?\:;"\(\)!&$#]')  # remove punctuation
-    words = sentence.get()
-    words = punc.sub(r' ', words)
-    words = words.lower().split()
-    for word in words:
-        word = word.strip()
-        if not word:
-            words.remove(word)
-    return words
+class Lexicon:
+
+    def __init__(self):
+        self.lexicon = {}
+
+
+class Parser:
+
+    def __init__(self):
+        self.grammar = Grammar()
+        self.lexicon = Lexicon()
+        self.pos_set = set()
+        self.sentence = StringVar()
+        self.parse = StringVar()
+
+    def show_lexicon(self):
+        # Shows the lexicon in a window
+        if not self.lexicon:
+            messagebox.showinfo(message="There is no lexicon to show.")
+            return
+        messagebox.showinfo(message=str(self.lexicon))
+
+    def show_grammar(self):
+        # Shows the grammar in a window
+        if not self.grammar:
+            messagebox.showinfo(message="There is no grammar to show.")
+            return
+        messagebox.showinfo(message=str(self.grammar))
+
+    def parse_sentence(self):
+        string = self.parse()
+        if not string:
+            messagebox.showinfo(message="That sentence did not parse.")
+        else:
+            messagebox.showinfo(message=string)
+
+    def parse(self):
+        # Shows a successful parse in a dialog window
+        # if one is found, a n alternate message if not.
+        punc = re.compile(r'[\.,?\:;"\(\)!&$#]')  # remove punctuation
+        words = self.sentence.get()
+        words = punc.sub(r' ', words)
+        words = words.lower().split()
+        for word in words:
+            word = word.strip()
+            if not word:
+                words.remove(word)
+        input_list = make_input_list(words)  # get edges of sentence
+        key_list = []
+        arc_list = []
+        chart = []
+        name = 0
+        for word in input_list:
+            pos = self.lexicon[word[0]]  # get parts of speech of words
+            # add keys for words to key list
+            for pos in pos:
+                key = [pos, word[1], word[2], name, -1]  # create key
+                name += 1
+                key_list.append(key)
+            # assess each key on key list
+            while len(key_list) != 0:
+                key = key_list[0]
+                key_list.remove(key)
+                if key[0] in self.grammar:
+                    arcs = self.grammar[key[0]]  # get list of rules starting with key
+                    # create an arc for each rule and add to arc list
+                    for rule in arcs:
+                        tracer = (len(rule) - 1) * [-1]
+                        arc = [rule, [key[1], key[1]], 0, tracer]
+                        arc_list.append(arc)
+                # extend each arc and add back to arc list
+                temp = []
+                for arc in arc_list:
+                    arc2 = copy.deepcopy(arc)
+                    arc2 = extend_arc(arc2, key)
+                    # arc successfully extended
+                    if arc2 != []:
+                        temp.append(arc2)
+                        # arc is successfully made into a constituent,
+                        # update key list to contain constituent, remove arc
+                        if arc2[2] == len(arc2[3]):
+                            constituent = [
+                                arc2[0][0], arc2[1][0], arc2[1][1], name, arc2[3]]
+                            name += 1
+                            key_list.append(constituent)
+                            temp.remove(arc2)
+                # add extended arcs back to arc list
+                arc_list += temp
+                # add key to chart
+                chart.append(key)
+        parsed = False
+        initial_symbol = []
+        # check for initial symbol
+        for key in chart:
+            if key[:-2] == ['S', 0, len(words)]:
+                parsed = True
+                initial_symbol = key
+        if parsed:
+            return self.find_parse(chart, initial_symbol, input_list)
+
+    def find_parse(self, chart, node, word_list):
+        # Backtrace the chart to get correct parse
+        # leaf node found
+        if node[4] == -1:
+            word = get_node(node, word_list)
+            return '[.{} {} ] '.format(node[0], word[0])
+        # explore children
+        else:
+            parse = '[.{} '.format(node[0])
+            children = find_children(chart, node)
+            for child in children:
+                parse += find_parse(chart, child, word_list)
+            parse += '] '
+            return parse
 
 
 # Provides a detailed account of the chart parsing
@@ -236,83 +339,6 @@ def verbose_parse(*args):
             sentence.get(), find_parse(chart, initial_symbol, input_list)))
 
 
-# Shows a successful parse in a dialog window
-# if one is found, a n alternate message if not.
-def regular_parse(*args):
-    words = process_input()
-    input_list = make_input_list(words)  # get edges of sentence
-    key_list = []
-    arc_list = []
-    chart = []
-    name = 0
-    for word in input_list:
-        pos = lexicon[word[0]]  # get parts of speech of words
-        # add keys for words to key list
-        for pos in pos:
-            key = [pos, word[1], word[2], name, -1]  # create key
-            name += 1
-            key_list.append(key)
-        # assess each key on key list
-        while len(key_list) != 0:
-            key = key_list[0]
-            key_list.remove(key)
-            if key[0] in grammar:
-                arcs = grammar[key[0]]  # get list of rules starting with key
-                # create an arc for each rule and add to arc list
-                for rule in arcs:
-                    tracer = (len(rule) - 1) * [-1]
-                    arc = [rule, [key[1], key[1]], 0, tracer]
-                    arc_list.append(arc)
-            # extend each arc and add back to arc list
-            temp = []
-            for arc in arc_list:
-                arc2 = copy.deepcopy(arc)
-                arc2 = extend_arc(arc2, key)
-                # arc successfully extended
-                if arc2 != []:
-                    temp.append(arc2)
-                    # arc is successfully made into a constituent,
-                    # update key list to contain constituent, remove arc
-                    if arc2[2] == len(arc2[3]):
-                        constituent = [
-                            arc2[0][0], arc2[1][0], arc2[1][1], name, arc2[3]]
-                        name += 1
-                        key_list.append(constituent)
-                        temp.remove(arc2)
-            # add extended arcs back to arc list
-            arc_list += temp
-            # add key to chart
-            chart.append(key)
-    parsed = False
-    initial_symbol = []
-    # check for initial symbol
-    for key in chart:
-        if key[:-2] == ['S', 0, len(words)]:
-            parsed = True
-            initial_symbol = key
-    if not parsed:
-        messagebox.showinfo(message="That sentence did not parse.")
-    else:
-        string = find_parse(chart, initial_symbol, input_list)
-        messagebox.showinfo(message=string)
-
-
-# Backtrace the chart to get correct parse
-def find_parse(chart, node, word_list):
-    # leaf node found
-    if node[4] == -1:
-        word = get_node(node, word_list)
-        if word[0] == 'i':
-            word[0] = 'I'
-        return '[.{} {} ] '.format(node[0], word[0])
-    # explore children
-    else:
-        parse = '[.{} '.format(node[0])
-        children = find_children(chart, node)
-        for child in children:
-            parse += find_parse(chart, child, word_list)
-        parse += '] '
-        return(parse)
 
 
 # Returns the word corresponding to that node
@@ -379,7 +405,6 @@ def read_lexicon(file):
 # Reads the given grammar file into the stored grammar,
 # and replaces the old one
 def read_grammar(file):
-    grammar = {}
     # read in grammar file
     with open(file) as f:
         while True:
@@ -508,22 +533,6 @@ def chart_to_str(chart, length):
         output += left_space + mid + '\n'
     output += '\n'
     return(output)
-
-
-# Shows the lexicon in a window
-def show_lexicon():
-    if not lexicon:
-        messagebox.showinfo(message="There is no lexicon to show.")
-        return
-    messagebox.showinfo(message=lexicon_to_str())
-
-
-# Shows the grammar in a window
-def show_grammar():
-    if not grammar:
-        messagebox.showinfo(message="There is no grammar to show.")
-        return
-    messagebox.showinfo(message=grammar_to_str())
 
 
 # Returns the grammar as a print-friendly string
@@ -727,37 +736,39 @@ def exit(*args):
     mainframe.quit()
 
 
-# constructs graphical interface
-root = Tk()
-root.title("Interactive Parser")
+def main():
+    # constructs graphical interface
+    root = Tk()
+    root.title("Interactive Parser")
 
-mainframe = ttk.Frame(root, padding='3 3 12 12')
-mainframe.grid(column=0, row=0, sticky=(N, W, E, S))
-mainframe.columnconfigure(0, weight=1)
-mainframe.rowconfigure(0, weight=1)
+    mainframe = ttk.Frame(root, padding='3 3 12 12')
+    mainframe.grid(column=0, row=0, sticky=(N, W, E, S))
+    mainframe.columnconfigure(0, weight=1)
+    mainframe.rowconfigure(0, weight=1)
+    parser = Parser()
+    ttk.Button(mainframe, text='Show Lexicon', width=15, command=parser.show_lexicon).grid(column=1, row=1, sticky=W)
+    ttk.Button(mainframe, text='Show Grammar', width=15, command=parser.show_grammar).grid(column=1, row=2, sticky=W)
+    ttk.Button(mainframe, text='Add a Word', width=15, command=parser.prompt_word).grid(column=2, row=1, sticky=W)
+    ttk.Button(mainframe, text='Add a Rule', width=15, command=parser.prompt_rule).grid(column=2, row=2, sticky=W)
+    ttk.Button(mainframe, text='Import Lexicon', width=15, command=parser.import_lexicon).grid(column=3, row=1, sticky=W)
+    ttk.Button(mainframe, text='Import Grammar', width=15, command=parser.import_grammar).grid(column=3, row=2, sticky=W)
+    ttk.Button(mainframe, text='Search for Word', width=15, command=parser.search_word).grid(column=1, row=8, sticky=W)
+    sentence_entry = ttk.Entry(mainframe, width=15, textvariable=parser.sentence)
+    sentence_entry.grid(column=2, row=5, columnspan=2, sticky=(W, E))
+    ttk.Button(mainframe, text='Parse', width=15, command=parser.parse_sentence).grid(column=3, row=6, sticky=E)
+    ttk.Button(mainframe, text='Exit', width=10, command=exit).grid(column=3, row=8, sticky=E)
+    ttk.Label(mainframe, text='Enter a sentence:').grid(column=1, row=5, sticky=E)
+    ttk.Label(mainframe, text='').grid(column=1, row=3, sticky=E)
+    ttk.Label(mainframe, text='').grid(column=1, row=7, sticky=E)
 
-sentence = StringVar()
-parse = StringVar()
+    for child in mainframe.winfo_children():
+        child.grid_configure(padx=5, pady=5)  # adds padding around every widget
 
-ttk.Button(mainframe, text='Show Lexicon', width=15, command=show_lexicon).grid(column=1, row=1, sticky=W)
-ttk.Button(mainframe, text='Show Grammar', width=15, command=show_grammar).grid(column=1, row=2, sticky=W)
-ttk.Button(mainframe, text='Add a Word', width=15, command=prompt_word).grid(column=2, row=1, sticky=W)
-ttk.Button(mainframe, text='Add a Rule', width=15, command=prompt_rule).grid(column=2, row=2, sticky=W)
-ttk.Button(mainframe, text='Import Lexicon', width=15, command=import_lexicon).grid(column=3, row=1, sticky=W)
-ttk.Button(mainframe, text='Import Grammar', width=15, command=import_grammar).grid(column=3, row=2, sticky=W)
-ttk.Button(mainframe, text='Search for Word', width=15, command=prompt_search).grid(column=1, row=8, sticky=W)
-sentence_entry = ttk.Entry(mainframe, width=15, textvariable=sentence)
-sentence_entry.grid(column=2, row=5, columnspan=2, sticky=(W, E))
-ttk.Button(mainframe, text='Parse', width=15, command=parse_sentence).grid(column=3, row=6, sticky=E)
-ttk.Button(mainframe, text='Exit', width=10, command=exit).grid(column=3, row=8, sticky=E)
-ttk.Label(mainframe, text='Enter a sentence:').grid(column=1, row=5, sticky=E)
-ttk.Label(mainframe, text='').grid(column=1, row=3, sticky=E)
-ttk.Label(mainframe, text='').grid(column=1, row=7, sticky=E)
+    sentence_entry.focus()  # user doesn't have to click first
+    root.bind('<Return>', parse_sentence)
 
-for child in mainframe.winfo_children():
-    child.grid_configure(padx=5, pady=5)  # adds padding around every widget
+    root.mainloop()
 
-sentence_entry.focus()  # user doesn't have to click first
-root.bind('<Return>', parse_sentence)
 
-root.mainloop()
+if __name__ == '__main__':
+    main()
