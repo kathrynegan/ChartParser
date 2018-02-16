@@ -28,23 +28,21 @@ import copy
 class Grammar:
 
     def __init__(self):
-        self.grammar = {}  # initial terminal mapped to rule
+        self.grammar = {}  # first mapped to rule
+        self.headfirst = {}
 
     def __str__(self):
         output = []
-        for terminal in self:
-            for rule in self[terminal]:
-                children = ' '.join(rule[1:])
-                entry = '{} --> {}'.format(rule[0], children)
-                output.append(entry)
+        for rule in sorted(self.headfirst.values()):
+            output.append(str(rule))
         return '\n'.join(output)
 
     def __getitem__(self, item):
         return self.grammar[item]
 
     def __iter__(self):
-        for terminal in self.grammar:
-            yield terminal
+        for first in self.grammar:
+            yield first
 
     def import_grammar(self, f):
         self.grammer = {}
@@ -53,20 +51,70 @@ class Grammar:
                 continue
             self.add(line)
 
+    def first_node(self, first):
+        return self.grammar[first]
+
     def add(self, rule):
         try:
-            parent, children = rule.split('-->')
+            rule = Rule.from_string(rule)
         except ValueError:
             return False
-        parent = parent.strip().upper()
-        children = tuple([child.upper() for child in children.split()])
-        if not parent or not children:
-            return False
-        rule = (parent,) + children
-        # identify first terminal node
-        terminal = children[0]
-        self.grammar.setdefault(terminal, set()).add(rule)
+        self.grammar.setdefault(rule.first, set()).add(rule)
+        self.headfirst.setdefault(rule.parent, set()).add(rule)
         return True
+
+
+class Rule:
+
+    def __init__(self, *args):
+        if len(args) < 2:
+            raise ValueError
+        self._rule = tuple([a.upper() for a in args])
+
+    @property
+    def first(self):
+        return self._rule[1]
+
+    @property
+    def parent(self):
+        return self._rule[0]
+
+    @property
+    def children(self):
+        return self._rule[1:]
+
+    @property
+    def rule(self):
+        return self._rule
+
+    def __str__(self):
+        return '{} --> {}'.format(self.parent, ' '.join(self.children))
+
+    def __eq__(self, other):
+        return self.rule == other.rule
+
+    def __lt__(self, other):
+        return self.rule < other.rule
+
+    def __hash__(self):
+        return hash(self.rule)
+
+    def __len__(self):
+        return len(self.rule)  # parent
+
+    @classmethod
+    def from_string(self, rule):
+        left, right = rule.split('-->')
+        left = left.split()
+        right = right.split()
+        if len(left) != 1:
+            raise ValueError('Left side of rule must have one node')
+        if len(right) < 1:
+            raise ValueError('Right side or rule must have at least one node')
+        return self(*left + right)
+
+    def is_sentence(self):
+        return self.parent == 'S'
 
 
 class Lexicon:
@@ -126,6 +174,182 @@ class Lexicon:
         return self.rlexicon[pos]
 
 
+class Arc:
+
+    def __init__(self, rule, start, end, dot, history=None):
+        self.rule = rule
+        self.start = start
+        self.end = end
+        self.dot = dot
+        if history:
+            self.history = history
+        else:
+            self.history = [-1] * (len(rule) - 1)
+
+    @property
+    def identity(self):
+        return id(self)
+
+    def __str__(self):
+        left = self.rule.parent
+        right = list(self.rule.children)
+        right.insert(self.dot, '*')
+        right = ' '.join(right)
+        return '<{}> {} --> {} {} <{}> {}'.format(
+            self.start, left, right, self.history, self.end, self.identity)
+
+    def get_extended(self, key):
+        # Returns an extended arc if the arc can be
+        # extended, otherwise an empty list
+        # part of speech of key and next element on arc must match
+        # right edge of arc and left edge of key must match
+        if self._nonextendable(key):
+            raise ValueError('Cannot extend {} with {}'.format(self, key))
+        extended = Arc(
+            self.rule, self.start, key.end,
+            self.dot + 1, self.history)
+        extended.history[self.dot] = key.identity
+        return extended
+
+    def extend(self, key):
+        if self._nonextendable(key):
+            raise ValueError('Cannot extend {} with {}'.format(self, key))
+        self.history[self.dot] = key.identity
+        self.end = key.end
+        self.dot += 1
+
+    def _nonextendable(self, other):
+        return (
+            self.is_complete() or
+            self.rule.children[self.dot] != other.rule.parent or
+            self.end != other.start)
+
+    def is_complete(self):
+        return self.dot == len(self.rule.children)
+
+    def __eq__(self, other):
+        return (
+            self.rule == other.rule and
+            self.start == other.start and
+            self.end == other.end and
+            self.dot == other.dot and
+            self.history == other.history)
+
+
+class Chart():
+
+    def __init__(self, tokens):
+        self._chart = []
+        self._tokens = tokens
+        self._sentence = None
+
+    @property
+    def length(self):
+        return len(self._tokens)
+
+    @property
+    def sentence(self):
+        return self._sentence
+
+    @sentence.setter
+    def sentence(self, bool):
+        self._sentence = bool
+
+    @property
+    def is_sentence(self):
+        return self.sentence is not None
+
+    def add(self, arc):
+        if arc in self:
+            return
+        self._chart.append(arc)
+        if arc.rule.parent == 'S' and (arc.start, arc.end) == (0, self.length):
+            self.sentence = arc
+
+    def __contains__(self, arc):
+        return arc in self._chart
+
+    def __iter__(self):
+        for arc in self._chart:
+            yield arc
+
+    def __str__(self):
+        output = ['    '.join([str(x) for x in range(self.length + 1)])]
+        for arc in self:
+            line = []
+            for i in range(self.length):
+                if arc.start < i < arc.end:
+                    line.append('-')
+                else:
+                    line.append(' ')
+                if arc.start <= i and arc.end > i:
+                    line.append('-' * 4)
+                else:
+                    line.append(' ' * 4)
+            output.append('{}  {}'.format(''.join(line), arc.rule))
+        output = '\n'.join(output)
+        return output
+
+
+class Agenda:
+
+    def __init__(self, tokens, lexicon):
+        self.agenda = []
+        for index, token in enumerate(tokens):
+            for pos in lexicon.get_pos(token):
+                arc = Arc(Rule(pos, token), start=index, end=index + 1, dot=1)
+                self.queue(arc)
+        self.last = None
+
+    def choose_next(self):
+        index = self._choice_protocol()
+        iterations = len(self)
+        iteration = 0
+        while True:
+            current = self.agenda.pop(index)
+            if current.is_complete():
+                return current
+            self.queue(current)
+            iteration += 1
+            if iteration > iterations:
+                print(self)
+                print(current)
+                raise ValueError('Agenda exhausted, no parse found.')
+
+    def _choice_protocol(self):
+        return 0
+
+    def predict(self, grammar, current):
+        if not current.is_complete():
+            return
+        try:
+            predicted = grammar.first_node(current.rule.parent)
+        except KeyError:  # no rules for this key
+            return
+        # create an arc for each rule for current key
+        for i, rule in enumerate(predicted):
+            arc = Arc(rule, current.start, current.start, 0)
+            print('\tpredicted', arc)
+            self.queue(arc)
+
+    def extend(self, current):
+        for arc in self.agenda:
+            try:
+                self.queue(arc.get_extended(current))
+                print('\textended', arc)
+            except ValueError:
+                continue
+
+    def queue(self, item):
+        self.agenda.append(item)
+
+    def __str__(self):
+        return '\n'.join([str(arc) for arc in self.agenda])
+
+    def __len__(self):
+        return len(self.agenda)
+
+
 class InteractiveParser:
 
     def __init__(self):
@@ -167,71 +391,34 @@ class InteractiveParser:
             messagebox.showinfo(message="There is no grammar.")
             return
         if self.check_lexicon():
-            parse = self._parse()
+            chart = self._chartparse(self.sentence)
+            parse = self._backtrace(chart)
             if parse:
                 messagebox.showinfo(message=parse)
             else:
                 messagebox.showinfo(message="Sentence failed to parse.")
 
-    def _parse(self):
-        # sentence = self.sentence.get()
-        sentence = self.sentence
-        # remove punctuation
-        # sentence = re.sub(r'[\.,?\:;"\(\)!&$#]', ' ', sentence)
+    def _chartparse(self, sentence):
         tokens = sentence.upper().split()
-        edges = self._get_edges(tokens)  # get edges of sentence
-        keys = []
-        arcs = []
-        chart = []
-        index = 0
-        for token in edges:
-            # get parts of speech of words
-            pos = self.lexicon.get_pos(token[0])
-            # add keys for words to key list
-            for pos in self.lexicon.get_tokens(pos):
-                # MAKE A KEY OBJECT
-                key = [pos, token[1], token[2], index, -1]
-                index += 1
-                keys.append(key)
-            # assess each key on key list
-            while len(keys) != 0:
-                key = keys.pop(0)
-                terminal = key[0]
-                try:
-                    rules = self.grammar[terminal]
-                except KeyError:
-                    return
-                    # get list of rules starting with key
-                # create an arc for each rule and add to arc list
-                for rule in rules:
-                    tracer = (len(rule) - 1) * [-1]
-                    arc = [rule, [key[1], key[1]], 0, tracer]
-                    arcs.append(arc)
-                # extend each arc and add back to arc list
-                temp = []
-                for arc in arcs:
-                    arc2 = copy.deepcopy(arc)
-                    arc2 = self._extend_arc(arc2, key)
-                    # arc successfully extended
-                    if arc2:
-                        temp.append(arc2)
-                        # arc is successfully made into a constituent,
-                        # update key list to contain constituent, remove arc
-                        if arc2[2] == len(arc2[3]):
-                            constituent = [
-                                arc2[0][0],
-                                arc2[1][0],
-                                arc2[1][1],
-                                index,
-                                arc2[3]]
-                            index += 1
-                            keys.append(constituent)
-                            temp.remove(arc2)
-                # add extended arcs back to arc list
-                arcs.extend(temp)
-                # add key to chart
-                chart.append(key)
-        parsed = False
+        chart = Chart(tokens)
+        agenda = Agenda(tokens, self.lexicon)
+        while True:
+            try:
+                current = agenda.choose_next()
+            except ValueError:
+                return
+            agenda.predict(self.grammar, current)
+            agenda.extend(current)
+            if current.is_complete():
+                chart.add(current)
+            else:
+                agenda.queue(current)
+            if chart.is_sentence:
+                return chart
+
+    def _backtrace2(self, chart):
+        if not chart:
+            return
         initial_symbol = []
         # check for initial symbol
         for key in chart:
@@ -240,28 +427,6 @@ class InteractiveParser:
                 initial_symbol = key
         if parsed:
             return self._backtrace(chart, initial_symbol, edges)
-
-    def _extend_arc(self, arc, key):
-        # Returns an extended arc if the arc can be
-        # extended, otherwise an empty list
-        # part of speech of key and next element on arc must match
-        # right edge of arc and left edge of key must match
-        arc = []
-        if arc[0][arc[2] + 1] == key[0] and arc[1][1] == key[1]:
-            arc[1][1] = key[2]
-            arc[3][arc[2]] = key[3]
-            arc[2] += 1
-        return arc
-
-    def _get_edges(self, sequence):
-        # Returns the keys for this sentence as a list
-        edges = []
-        i = 0
-        for token in sequence:
-            key = [token, i, i + 1]
-            i += 1
-            edges.append(key)
-        return edges
 
     def _backtrace(self, chart, node, edges):
         # Backtrace the chart to get correct parse
@@ -347,8 +512,7 @@ class InteractiveParser:
     def _prompt(self, name):
         prompt = "Please enter a {}:".format(name)
         while True:
-            answer = simpledialog.askstring(
-                title="", prompt=prompt)
+            answer = simpledialog.askstring(title="", prompt=prompt)
             # user has cancelled
             if answer is None:
                 return
