@@ -20,9 +20,19 @@ def test_rule_const():
     rule = Rule('NP', 'DT', 'N')
     assert rule.parent == 'NP'
     assert rule.children == ('DT', 'N')
+
     rule = Rule.from_string('NP --> DT N')
     assert rule.parent == 'NP'
     assert rule.children == ('DT', 'N')
+
+    rule = Rule.from_pair('NP', 'N')
+    assert rule.parent == 'NP'
+    assert rule.children == ('N',)
+
+    rule = Rule.from_pair('VP', 'VP NP')
+    assert rule.parent == 'VP'
+    assert rule.children == ('VP', 'NP')
+
     with pytest.raises(ValueError):
         Rule.from_string('--> V')
     with pytest.raises(ValueError):
@@ -54,32 +64,32 @@ def test_rule_len():
 
 
 def test_arc_string():
-    assert str(Arc(Rule('NP', 'N'), 0, 0, 0, [-1])) == \
-        '<0> NP --> * N [-1] <0>'
-    assert str(Arc(Rule('VP', 'AUX', 'V'), 2, 4, 2, [2, 3])) ==\
-        '<2> VP --> AUX V * [2, 3] <4>'
+    arc1 = Arc(Rule('NP', 'N'), 0, 0, 0, [None])
+    assert str(arc1) == '<0> NP --> *0 N [None] <0> {}'.format(id(arc1))
+    arc2 = Arc(Rule('VP', 'AUX', 'V'), 2, 4, 2, [arc1, None])
+    assert str(arc2) == \
+        '<2> VP --> AUX V *2 [{}, None] <4> {}'.format(id(arc1), id(arc2))
 
 
 def test_arc_extend():
     key = Arc(Rule('N', 'cat'), start=0, end=1, dot=1)
     arc = Arc(Rule('NP', 'N'), start=0, end=0, dot=0)
-    assert arc.history == [-1]
     ext = arc.get_extended(key)
     assert ext.rule == Rule('NP', 'N')
     assert ext.start == 0
     assert ext.end == 1
     assert ext.dot == 1
-    assert ext.history == [id(key)]
+    assert ext.history == [key]
 
     # key parent does not match current node in arc children
+    arc = Arc(Rule('VP', 'V'), start=0, end=0, dot=0)
     with pytest.raises(ValueError):
-        arc = Arc(Rule('VP', 'V'), start=0, end=0, dot=0)
         arc.get_extended(key)
+    arc = Arc(Rule('NP', 'N'), start=1, end=2, dot=0)
     with pytest.raises(ValueError):
-        arc = Arc(Rule('NP', 'N'), start=1, end=2, dot=0)
         arc.get_extended(key)
+    arc = Arc(Rule('NP', 'DT', 'N'), start=0, end=2, dot=1)
     with pytest.raises(ValueError):
-        arc = Arc(Rule('NP', 'DT', 'N'), start=0, end=2, dot=1)
         arc.get_extended(key)
 
 
@@ -127,156 +137,224 @@ def test_chart():
     assert str(chart) == '\n'.join(answer)
 
 
-# def test_lexicon_add():
-#     lexicon = Lexicon()
-#     lexicon.add('horse ', ' n ')
-#     assert lexicon['HORSE'] == {'N'}
-#     assert lexicon.get_tokens('N') == {'HORSE'}
-#     lexicon.add(' eats ', 'V')
-#     assert lexicon['EATS'] == {'V'}
-#     assert lexicon.get_tokens('V') == {'EATS'}
-#     lexicon.add('horSE', ' x')
-#     assert lexicon['HORSE'] == {'N', 'X'}
-#     assert lexicon.get_tokens('X') == {'HORSE'}
-#     lexicon.add('cow', 'n')
-#     assert lexicon['COW'] == {'N'}
-#     assert lexicon.get_tokens('N') == {'HORSE', 'COW'}
+def test_lexicon_add():
+    lexicon = Lexicon()
+    lexicon.add('horse ', ' n ')
+    assert lexicon['HORSE'] == {'N'}
+    assert lexicon.get_tokens('N') == {'HORSE'}
+    lexicon.add(' eats ', 'V')
+    assert lexicon['EATS'] == {'V'}
+    assert lexicon.get_tokens('V') == {'EATS'}
+    lexicon.add('horSE', ' x')
+    assert lexicon['HORSE'] == {'N', 'X'}
+    assert lexicon.get_tokens('X') == {'HORSE'}
+    lexicon.add('cow', 'n')
+    assert lexicon['COW'] == {'N'}
+    assert lexicon.get_tokens('N') == {'HORSE', 'COW'}
 
 
-# def test_lexicon_import():
-#     lex = """
-#         PN : I
-#         N : can, play, guitar
-#         V : play
-#         AUX : can
-#         DT : a, the
-#         ADJ : five-string
-#         """
-#     f = StringIO(lex)
-#     lexicon = Lexicon()
-#     lexicon.import_lexicon(f)
-#     assert lexicon['CAN'] == {'AUX', 'N'}
-#     assert lexicon['FIVE-STRING'] == {'ADJ'}
-#     assert lexicon.get_tokens('N') == {'CAN', 'PLAY', 'GUITAR'}
-
-
-# def test_print_lexicon():
-#     lex = """
-#         PN : I
-#         N : can, play, guitar
-#         V : play
-#         AUX : can
-#         DT : a, the
-#         ADJ : five-string
-#         """
-#     f = StringIO(lex)
-#     lexicon = Lexicon()
-#     lexicon.import_lexicon(f)
-#     answer = [
-#         "ADJ : FIVE-STRING",
-#         "AUX : CAN",
-#         "DT : A, THE",
-#         "N : CAN, GUITAR, PLAY",
-#         "PN : I",
-#         "V : PLAY"]
-#     answer = '\n'.join(answer)
-#     assert str(lexicon) == answer
-
-
-# def test_grammar_add():
-#     grammar = Grammar()
-#     grammar.add('np --> n')
-#     assert grammar['N'] == {('NP', 'N')}
-#     grammar.add('vp --> v np')
-#     assert grammar['V'] == {('VP', 'V', 'NP')}
-#     x = grammar.add('x')
-#     assert x is False
-#     assert 'X' not in grammar
-
-
-# def test_grammar_import():
-#     grammar = Grammar()
-#     gram = """
-#         S --> NP VP
-#         NP --> DT N
-#         NP --> PN
-#         VP --> V
-#         vp --> v nP
-#         x
-#         y
-#         z --> 
-
-#         """
-#     f = StringIO(gram)
-#     grammar.import_grammar(f)
-#     assert grammar['NP'] == {('S', 'NP', 'VP')}
-#     assert grammar['V'] == {('VP', 'V'), ('VP', 'V', 'NP')}
-
-
-# def test_grammar_str():
-#     grammar = Grammar()
-#     gram = """
-#         S --> NP VP
-#         NP --> DT N
-#         NP --> PN
-#         VP --> V
-#         vp --> v nP
-#         x
-#         y
-#         z --> 
-
-#         """
-#     f = StringIO(gram)
-#     grammar.import_grammar(f)
-#     answer = [
-#         "NP --> DT N",
-#         "S --> NP VP",
-#         "NP --> PN",
-#         "VP --> V",
-#         "VP --> V NP"]
-#     answer = '\n'.join(answer)
-#     result = str(grammar)
-#     assert result == answer
-
-
-
-def test_parser():
-    gram = """
-        S --> NP VP
-        NP --> DT N
-        NP --> DT ADJ N
-        NP --> PN
-        VP --> V
-        VP --> VP NP
-        VP --> AUX VP
-        """
+def test_lexicon_import():
     lex = """
         PN : I
-        ADJ : little
-        N : can, play, guitar, boy
+        N : can, play, guitar
         V : play
         AUX : can
         DT : a, the
         ADJ : five-string
         """
-    # gram = """
-    #     S --> NP VP
-    #     NP --> PN
-    #     VP --> V
-    #     """
-    # lex = """
-    #     PN : I
-    #     V : sleep
-    #     """
-    # root = Tk()
-    parser = InteractiveParser()
-    parser.grammar.import_grammar(StringIO(gram))
-    parser.lexicon.import_lexicon(StringIO(lex))
-    # parser.sentence = 'the little boy can play the guitar'
-    # assert parser.sentence == 'the little boy can play the guitar'
-    chart = parser._chartparse('the little boy can play the guitar')
-    print(chart)
-    # chart = parser._chartparse('i i')
-    # print(chart)
-    assert False
-#     # assert edges ==  [('I', 0, 1), ('CAN', 1, 2), ('PLAY', 2, 3), ('THE', 3, 4), ('GUITAR', 4, 5)]
+    f = StringIO(lex)
+    lexicon = Lexicon()
+    lexicon.import_lexicon(f)
+    assert lexicon['CAN'] == {'AUX', 'N'}
+    assert lexicon['FIVE-STRING'] == {'ADJ'}
+    assert lexicon.get_tokens('N') == {'CAN', 'PLAY', 'GUITAR'}
+
+
+def test_lexicon_nonzero():
+    lexicon = Lexicon()
+    assert not lexicon
+    lexicon.add('dog', 'n')
+    assert lexicon
+
+
+def test_print_lexicon():
+    lex = """
+        PN : I
+        N : can, play, guitar
+        V : play
+        AUX : can
+        DT : a, the
+        ADJ : five-string
+        """
+    f = StringIO(lex)
+    lexicon = Lexicon()
+    lexicon.import_lexicon(f)
+    answer = [
+        "ADJ : FIVE-STRING",
+        "AUX : CAN",
+        "DT : A, THE",
+        "N : CAN, GUITAR, PLAY",
+        "PN : I",
+        "V : PLAY"]
+    answer = '\n'.join(answer)
+    assert str(lexicon) == answer
+
+
+def test_grammar_add():
+    grammar = Grammar()
+    grammar.add('np --> n')
+    assert grammar['N'] == {Rule('NP', 'N')}
+    grammar.add('vp', ' v np')
+    assert grammar['V'] == {Rule('VP', 'V', 'NP')}
+    grammar.add('NP', 'N', 'Y')
+    assert grammar['N'] == {Rule('NP', 'N'), Rule('NP', 'N', 'Y')}
+    with pytest.raises(ValueError):
+        grammar.add('x')
+
+
+def test_grammar_import():
+    grammar = Grammar()
+    gram = """
+        S --> NP VP
+        NP --> DT N
+        NP --> PN
+        VP --> V
+        vp --> v nP
+        x
+        y
+        z --> 
+
+        """
+    f = StringIO(gram)
+    grammar.import_grammar(f)
+    assert grammar['NP'] == {Rule('S', 'NP', 'VP')}
+    assert grammar['V'] == {Rule('VP', 'V'), Rule('VP', 'V', 'NP')}
+
+
+def test_grammar_str():
+    grammar = Grammar()
+    gram = """
+        S --> NP VP
+        NP --> DT N
+        NP --> PN
+        VP --> V
+        vp --> v nP
+        x
+        y
+        z --> 
+
+        """
+    f = StringIO(gram)
+    grammar.import_grammar(f)
+    answer = [
+        "NP --> DT N",
+        "NP --> PN",
+        "S --> NP VP",
+        "VP --> V",
+        "VP --> V NP"]
+    answer = '\n'.join(answer)
+    result = str(grammar)
+    print(result)
+    assert result == answer
+
+
+# def test_parser_simple():
+#     gram = """
+#         S --> NP VP
+#         NP --> PN
+#         VP --> V
+#         """
+#     lex = """
+#         PN : I
+#         V : sleep
+#         """
+#     parser = InteractiveParser()
+#     parser.grammar.import_grammar(StringIO(gram))
+#     parser.lexicon.import_lexicon(StringIO(lex))
+#     chart = parser._chartparse('i sleep')
+#     arcs = [
+#         Arc(Rule('S', 'NP', 'VP'), 0, 2, 2),
+#         Arc(Rule('NP', 'PN'), 0, 1, 1),
+#         Arc(Rule('VP', 'V'), 1, 2, 1),
+#         Arc(Rule('PN', 'I'), 0, 1, 1),
+#         Arc(Rule('V', 'SLEEP'), 1, 2, 1)]
+#     for arc in arcs:
+#         assert arc in chart
+#     for arc in chart:
+#         assert arc in arcs
+#     parse = parser._backtrace(chart)
+#     for arc in arcs:
+#         assert arc in parse
+#     for arc in parse:
+#         assert arc in arcs
+#     chart = parser._chartparse('i i')
+#     assert chart is None
+#     parse = parser._backtrace(chart)
+#     assert parse is None
+
+
+# def test_parser_complex():
+#     gram = """
+#         S --> NP VP
+#         NP --> DT N
+#         NP --> DT ADJ N
+#         NP --> PN
+#         VP --> V
+#         VP --> VP NP
+#         VP --> AUX VP
+#         """
+#     lex = """
+#         PN : I
+#         ADJ : little
+#         N : can, play, guitar, boy
+#         V : play
+#         AUX : can
+#         DT : a, the
+#         ADJ : five-string
+#         """
+#     parser = InteractiveParser()
+#     parser.grammar.import_grammar(StringIO(gram))
+#     parser.lexicon.import_lexicon(StringIO(lex))
+#     chart = parser._chartparse('the little boy can play the guitar')
+#                             #  0   1      2   3   4    5   6      7
+#     my_chart = [
+#         Arc(Rule('S', 'NP', 'VP'), 0, 7, 2),
+#         Arc(Rule('NP', 'DT', 'ADJ', 'N'), 0, 3, 3),
+#         Arc(Rule('DT', 'THE'), 0, 1, 1),
+#         Arc(Rule('ADJ', 'LITTLE'), 1, 2, 1),
+#         Arc(Rule('N', 'BOY'), 2, 3, 1),
+#         Arc(Rule('VP', 'AUX', 'VP'), 3, 7, 2),
+#         Arc(Rule('AUX', 'CAN'), 3, 4, 1),
+#         Arc(Rule('N', 'CAN'), 3, 4, 1),
+#         Arc(Rule('VP', 'VP', 'NP'), 4, 7, 2),
+#         Arc(Rule('VP', 'V'), 4, 5, 1),
+#         Arc(Rule('V', 'PLAY'), 4, 5, 1),
+#         Arc(Rule('N', 'PLAY'), 4, 5, 1),
+#         Arc(Rule('NP', 'DT', 'N'), 5, 7, 2),
+#         Arc(Rule('DT', 'THE'), 5, 6, 1),
+#         Arc(Rule('N', 'GUITAR'), 6, 7, 1),
+#         Arc(Rule('VP', 'AUX', 'VP'), 3, 5, 2),
+#         Arc(Rule('S', 'NP', 'VP'), 0, 5, 2)]
+#     for arc in my_chart:
+#         assert arc in chart
+#     for arc in chart:
+#         assert arc in my_chart
+#     my_parse = [
+#         Arc(Rule('S', 'NP', 'VP'), 0, 7, 2),
+#         Arc(Rule('NP', 'DT', 'ADJ', 'N'), 0, 3, 3),
+#         Arc(Rule('DT', 'THE'), 0, 1, 1),
+#         Arc(Rule('ADJ', 'LITTLE'), 1, 2, 1),
+#         Arc(Rule('N', 'BOY'), 2, 3, 1),
+#         Arc(Rule('VP', 'AUX', 'VP'), 3, 7, 2),
+#         Arc(Rule('AUX', 'CAN'), 3, 4, 1),
+#         Arc(Rule('VP', 'VP', 'NP'), 4, 7, 2),
+#         Arc(Rule('VP', 'V'), 4, 5, 1),
+#         Arc(Rule('V', 'PLAY'), 4, 5, 1),
+#         Arc(Rule('NP', 'DT', 'N'), 5, 7, 2),
+#         Arc(Rule('DT', 'THE'), 5, 6, 1),
+#         Arc(Rule('N', 'GUITAR'), 6, 7, 1)]
+#     parse = parser._backtrace(chart)
+#     for arc in my_parse:
+#         assert arc in parse
+#     for arc in parse:
+#         assert arc in my_parse
