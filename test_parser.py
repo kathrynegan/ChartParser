@@ -258,39 +258,39 @@ def test_grammar_str():
     assert result == answer
 
 
-# def test_parser_simple():
-#     gram = """
-#         S --> NP VP
-#         NP --> PN
-#         VP --> V
-#         """
-#     lex = """
-#         PN : I
-#         V : sleep
-#         """
-#     parser = InteractiveParser()
-#     parser.grammar.import_grammar(StringIO(gram))
-#     parser.lexicon.import_lexicon(StringIO(lex))
-#     chart = parser._chartparse('i sleep')
-#     arcs = [
-#         Arc(Rule('S', 'NP', 'VP'), 0, 2, 2),
-#         Arc(Rule('NP', 'PN'), 0, 1, 1),
-#         Arc(Rule('VP', 'V'), 1, 2, 1),
-#         Arc(Rule('PN', 'I'), 0, 1, 1),
-#         Arc(Rule('V', 'SLEEP'), 1, 2, 1)]
-#     for arc in arcs:
-#         assert arc in chart
-#     for arc in chart:
-#         assert arc in arcs
-#     parse = parser._backtrace(chart)
-#     for arc in arcs:
-#         assert arc in parse
-#     for arc in parse:
-#         assert arc in arcs
-#     chart = parser._chartparse('i i')
-#     assert chart is None
-#     parse = parser._backtrace(chart)
-#     assert parse is None
+def test_parser_simple():
+    gram = """
+        S --> NP VP
+        NP --> PN
+        VP --> V
+        """
+    lex = """
+        PN : I
+        V : sleep
+        """
+    parser = InteractiveParser()
+    parser.grammar.import_grammar(StringIO(gram))
+    parser.lexicon.import_lexicon(StringIO(lex))
+    chart = parser._chartparse('i sleep')
+    arcs = [
+        Arc(Rule('S', 'NP', 'VP'), 0, 2, 2),
+        Arc(Rule('NP', 'PN'), 0, 1, 1),
+        Arc(Rule('VP', 'V'), 1, 2, 1),
+        Arc(Rule('PN', 'I'), 0, 1, 1),
+        Arc(Rule('V', 'SLEEP'), 1, 2, 1)]
+    for arc in arcs:
+        assert arc in chart
+    for arc in chart:
+        assert arc in arcs
+    parse = parser._backtrace(chart)
+    for arc in arcs:
+        assert arc in parse
+    for arc in parse:
+        assert arc in arcs
+    chart = parser._chartparse('i i')
+    assert chart is None
+    parse = parser._backtrace(chart)
+    assert parse is None
 
 
 # def test_parser_complex():

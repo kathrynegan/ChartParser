@@ -407,7 +407,7 @@ class InteractiveParser:
             child.grid_configure(padx=5, pady=5)
         # ensure user doesn't have to click first
         self._sentence.focus()
-        # self.root.bind('<Return>', self.parse)
+        self.root.bind('<Return>', self.parse)
 
     @classmethod
     def no_GUI(cls):
@@ -433,31 +433,39 @@ class InteractiveParser:
         self._show(self.grammar)
 
     def _show(self, obj):
-        message = str(obj) if obj else "Nothing to show."
+        message = str(obj) if obj else "ERROR: Nothing to show."
         messagebox.showinfo(message=message)
 
     def parse(self):
         if not self.sentence:
-            messagebox.showinfo(message="There is no sentence to parse.")
-            return
-        if not self.lexicon:
-            messagebox.showinfo(message="There is no lexicon.")
-            return
-        if not self.grammar:
-            messagebox.showinfo(message="There is no grammar.")
             return
         try:
             chart = self._chartparse(self.sentence)
         except KeyError:
-            messagebox.showinfo(message="Unknown words found.")
+            messagebox.showinfo(message="ERROR: Unknown words.")
+        except IndexError:
+            messagebox.showinfo(message="ERROR: No grammar.")
         except ValueError:
-            messagebox.showinfo(message="Sentence failed to parse.")
+            messagebox.showinfo(message="ERROR: Sentence failed to parse.")
         else:
             parse = self._backtrace(chart)
             parse = self._to_string(parse)
             messagebox.showinfo(message=parse)
 
     def _to_string(self, parse):
+        # leaf node found
+        if node[4] == -1:
+            word = get_node(node, word_list)
+            if word[0] == 'i':
+                word[0] = 'I'
+            return('[.' + node[0] + ' ' + word[0] + ' ] ')
+        # explore children
+        else:
+            parse = '[.' + node[0] + ' '
+            children = find_children(chart, node)
+            for child in children:
+                parse += find_parse(chart, child, word_list)
+            parse += '] '
         return str(parse)
 
     def _chartparse(self, sentence):
@@ -503,8 +511,7 @@ class InteractiveParser:
                 module(f)
             except Exception as e:
                 messagebox.showinfo(
-                    message="An fatal error occurred while reading " +
-                    "the file..\n{}".format(name, e))
+                    message="ERROR: File did not load\n{}".format(name, e))
             else:
                 messagebox.showinfo(
                     message="{} successfully imported.".format(file))
@@ -548,7 +555,7 @@ class InteractiveParser:
         try:
             pos = self.lexicon.get_pos(word)
         except KeyError:
-            messagebox.showinfo(message="That word is not in the lexicon.")
+            messagebox.showinfo(message="Not found.")
         else:
             message = "The part(s) of speech of {} is/are:\n\n{}"
             message = message.format(word, ', '.join(sorted(pos)))
