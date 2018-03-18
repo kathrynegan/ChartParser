@@ -1,109 +1,176 @@
 """
 Kathryn Egan
+
+Only tests the functionality of the parser and its component
+parts. Does not text functionality of GUI.
 """
 import pytest
 from io import StringIO
-from interactive_parser import InteractiveParser
-from interactive_parser import Lexicon
-from interactive_parser import Grammar
-from interactive_parser import Arc
-from interactive_parser import Rule
-from interactive_parser import Chart
-from tkinter import *
-from tkinter import ttk
-from tkinter import messagebox
-from tkinter import simpledialog
-from tkinter import filedialog
+from chartparser.parser import Parser
+from chartparser.rule_dict import Lexicon
+from chartparser.rule_dict import Grammar
+from chartparser.rule import NonTerminal
+from chartparser.rule import Terminal
+from chartparser.arc import Arc
+from chartparser.chart import Chart
+from chartparser.agenda import Agenda
 
 
-def test_rule_const():
-    rule = Rule('NP', 'DT', 'N')
-    assert rule.parent == 'NP'
-    assert rule.children == ('DT', 'N')
+###############
+# NONTERMINAL #
+###############
 
-    rule = Rule.from_string('NP --> DT N')
-    assert rule.parent == 'NP'
-    assert rule.children == ('DT', 'N')
 
-    rule = Rule.from_pair('NP', 'N')
-    assert rule.parent == 'NP'
-    assert rule.children == ('N',)
+def test_nonterminal_const():
+    nonterminal = NonTerminal('NP', 'DT', 'N')
+    assert nonterminal.parent == 'NP'
+    assert nonterminal.children == ('DT', 'N')
 
-    rule = Rule.from_pair('VP', 'VP NP')
-    assert rule.parent == 'VP'
-    assert rule.children == ('VP', 'NP')
+    nonterminal = NonTerminal.from_string('NP --> DT N')
+    assert nonterminal.parent == 'NP'
+    assert nonterminal.children == ('DT', 'N')
 
     with pytest.raises(ValueError):
-        Rule.from_string('--> V')
+        NonTerminal.from_string('--> V')
     with pytest.raises(ValueError):
-        Rule.from_string('NP VP --> V')
+        NonTerminal.from_string('NP VP --> V')
     with pytest.raises(ValueError):
-        Rule.from_string('VP -->')
+        NonTerminal.from_string('VP -->')
     with pytest.raises(ValueError):
-        Rule('VP')
+        NonTerminal('VP')
+    with pytest.raises(ValueError):
+        NonTerminal('VP', 'AUX V')
+    with pytest.raises(ValueError):
+        NonTerminal('S VP', 'V')
+
+    assert NonTerminal('S', 'V').is_sentence
+    assert not NonTerminal('VP', 'V').is_sentence
 
 
-def test_rule_eq():
+def test_nonterminal_eq():
+    nonterminal1 = 'NP --> DT N'
+    nonterminal2 = 'NP --> N'
+    assert NonTerminal.from_string(nonterminal1) == \
+        NonTerminal.from_string(nonterminal1)
+    assert NonTerminal.from_string(nonterminal1) != \
+        NonTerminal.from_string(nonterminal2)
+    assert NonTerminal.from_string(nonterminal1) < \
+        NonTerminal.from_string(nonterminal2)
+
+
+def test_nonterminal_str():
+    rules = [
+        'VP --> V',
+        'NP --> DT ADJ N']
+    for nonterminal in rules:
+        assert str(NonTerminal.from_string(nonterminal)) == nonterminal
+
+
+def test_rule_len():
+    assert len(NonTerminal('VP', 'ADV', 'V')) == 3
+
+
+############
+# TERMINAL #
+############
+
+
+def test_terminal_const():
+    terminal = Terminal('NP', 'horse')
+    assert terminal.parent == 'NP'
+    assert terminal.pos == 'NP'
+    assert terminal.children == ('HORSE',)
+    assert terminal.token == 'HORSE'
+
+    terminal = Terminal.from_string('  The : Dt  ')
+    assert terminal.token == 'THE'
+    assert terminal.pos == 'DT'
+
+    with pytest.raises(ValueError):
+        Terminal.from_string(': V')
+    with pytest.raises(ValueError):
+        Terminal.from_string('my cat : best')
+    with pytest.raises(ValueError):
+        Terminal.from_string(': doge')
+    with pytest.raises(ValueError):
+        Terminal('hello')
+    with pytest.raises(ValueError):
+        Terminal('V', 'raise up')
+    with pytest.raises(ValueError):
+        Terminal('S VP', 'yikes')
+
+
+def test_terminal_eq():
     rule1 = 'NP --> DT N'
     rule2 = 'NP --> N'
-    assert Rule.from_string(rule1) == Rule.from_string(rule1)
-    assert Rule.from_string(rule1) != Rule.from_string(rule2)
-    assert Rule.from_string(rule1) < Rule.from_string(rule2)
+    assert NonTerminal.from_string(rule1) == NonTerminal.from_string(rule1)
+    assert NonTerminal.from_string(rule1) != NonTerminal.from_string(rule2)
+    assert NonTerminal.from_string(rule1) < NonTerminal.from_string(rule2)
 
 
-def test_rule_str():
+def test_terminal_str():
     rules = [
         'VP --> V',
         'NP --> DT ADJ N']
     for rule in rules:
-        assert str(Rule.from_string(rule)) == rule
+        assert str(NonTerminal.from_string(rule)) == rule
 
 
-def test_rule_len():
-    assert len(Rule('VP', 'ADV', 'V')) == 3
+def test_terminal_len():
+    assert len(NonTerminal('VP', 'ADV', 'V')) == 3
+
+
+#######
+# ARC #
+#######
 
 
 def test_arc_string():
-    arc1 = Arc(Rule('NP', 'N'), 0, 0, 0, [None])
+    arc1 = Arc(NonTerminal('NP', 'N'), 0, 0, 0, [None])
     assert str(arc1) == '<0> NP --> *0 N [None] <0> {}'.format(id(arc1))
-    arc2 = Arc(Rule('VP', 'AUX', 'V'), 2, 4, 2, [arc1, None])
+    arc2 = Arc(NonTerminal('VP', 'AUX', 'V'), 2, 4, 2, [arc1, None])
     assert str(arc2) == \
         '<2> VP --> AUX V *2 [{}, None] <4> {}'.format(id(arc1), id(arc2))
 
 
 def test_arc_extend():
-    key = Arc(Rule('N', 'cat'), start=0, end=1, dot=1)
-    arc = Arc(Rule('NP', 'N'), start=0, end=0, dot=0)
+    key = Arc(NonTerminal('N', 'cat'), start=0, end=1, dot=1)
+    arc = Arc(NonTerminal('NP', 'N'), start=0, end=0, dot=0)
     ext = arc.get_extended(key)
-    assert ext.rule == Rule('NP', 'N')
+    assert ext.rule == NonTerminal('NP', 'N')
     assert ext.start == 0
     assert ext.end == 1
     assert ext.dot == 1
     assert ext.history == [key]
 
     # key parent does not match current node in arc children
-    arc = Arc(Rule('VP', 'V'), start=0, end=0, dot=0)
+    arc = Arc(NonTerminal('VP', 'V'), start=0, end=0, dot=0)
     with pytest.raises(ValueError):
         arc.get_extended(key)
-    arc = Arc(Rule('NP', 'N'), start=1, end=2, dot=0)
+    arc = Arc(NonTerminal('NP', 'N'), start=1, end=2, dot=0)
     with pytest.raises(ValueError):
         arc.get_extended(key)
-    arc = Arc(Rule('NP', 'DT', 'N'), start=0, end=2, dot=1)
+    arc = Arc(NonTerminal('NP', 'DT', 'N'), start=0, end=2, dot=1)
     with pytest.raises(ValueError):
         arc.get_extended(key)
 
 
 def test_arc_is_complete():
-    arc1 = Arc(Rule('DT', 'the'), 2, 3, 1, 10)
-    arc2 = Arc(Rule('NP', 'DT', 'N'), 2, 3, 1, 12)
-    arc3 = Arc(Rule('NP', 'DT', 'N'), 2, 3, 2, 14)
+    arc1 = Arc(NonTerminal('DT', 'the'), 2, 3, 1, [10])
+    arc2 = Arc(NonTerminal('NP', 'DT', 'N'), 2, 3, 1, [12])
+    arc3 = Arc(NonTerminal('NP', 'DT', 'N'), 2, 3, 2, [14])
     assert arc1.is_complete()
     assert not arc2.is_complete()
     assert arc3.is_complete()
 
 
+def test_arc_is_terminal():
+    assert Arc(Terminal('V', 'eat'), 0, 1, 1).is_terminal
+    assert not Arc(NonTerminal('VP', 'V'), 0, 1, 1, [101]).is_terminal
+
+
 def test_arc_eq():
-    rule = Rule('NP', 'N')
+    rule = NonTerminal('NP', 'N')
     start = 1
     end = 2
     dot = 1
@@ -115,16 +182,21 @@ def test_arc_eq():
         Arc(rule, start + 1, end, dot))
 
 
+#########
+# CHART #
+#########
+
+
 def test_chart():
     chart = Chart(['I', 'SLEEP'])
-    chart.add(Arc(Rule('PN', 'I'), 0, 1, 1))
+    chart.add(Arc(NonTerminal('PN', 'I'), 0, 1, 1))
     assert not chart.is_sentence
-    chart.add(Arc(Rule('V', 'SLEEP'), 1, 2, 1))
-    chart.add(Arc(Rule('NP', 'PN'), 0, 1, 1, [1]))
-    chart.add(Arc(Rule('VP', 'V'), 1, 2, 1, [2]))
-    chart.add(Arc(Rule('S', 'VP'), 1, 2, 1, [2]))
+    chart.add(Arc(NonTerminal('V', 'SLEEP'), 1, 2, 1))
+    chart.add(Arc(NonTerminal('NP', 'PN'), 0, 1, 1, [1]))
+    chart.add(Arc(NonTerminal('VP', 'V'), 1, 2, 1, [2]))
+    chart.add(Arc(NonTerminal('S', 'VP'), 1, 2, 1, [2]))
     assert not chart.is_sentence
-    chart.add(Arc(Rule('S', 'NP', 'VP'), 0, 2, 2, [3, 4]))
+    chart.add(Arc(NonTerminal('S', 'NP', 'VP'), 0, 2, 2, [3, 4]))
     assert chart.is_sentence
     answer = [
         '0    1    2',
@@ -137,115 +209,117 @@ def test_chart():
     assert str(chart) == '\n'.join(answer)
 
 
+###########
+# LEXICON #
+###########
+
+test_lex = """
+    I : PN
+    can : N
+    play : N
+    guitar : N
+    play : V
+    can : AUX
+    a : DT
+    the : DT
+    five-string : ADJ
+    """
+
+
 def test_lexicon_add():
     lexicon = Lexicon()
-    lexicon.add('horse ', ' n ')
-    assert lexicon['HORSE'] == {'N'}
-    assert lexicon.get_tokens('N') == {'HORSE'}
-    lexicon.add(' eats ', 'V')
-    assert lexicon['EATS'] == {'V'}
-    assert lexicon.get_tokens('V') == {'EATS'}
-    lexicon.add('horSE', ' x')
-    assert lexicon['HORSE'] == {'N', 'X'}
-    assert lexicon.get_tokens('X') == {'HORSE'}
-    lexicon.add('cow', 'n')
-    assert lexicon['COW'] == {'N'}
-    assert lexicon.get_tokens('N') == {'HORSE', 'COW'}
+    lexicon.add(Terminal.from_string('HORSE : N'))
+    assert lexicon['HORSE'] == {Terminal('N', 'HORSE'), }
+    lexicon.add(Terminal.from_string(' eats : V'))
+    assert lexicon['EATS'] == {Terminal('V', 'EATS'), }
+    lexicon.add(Terminal.from_string('horSE :  x'))
+    assert lexicon['HORSE'] == {Terminal('N', 'HORSE'), Terminal('X', 'HORSE')}
+    lexicon.add(Terminal.from_string('cow : n'))
+    assert lexicon['COW'] == {Terminal('N', 'COW'), }
 
 
 def test_lexicon_import():
-    lex = """
-        PN : I
-        N : can, play, guitar
-        V : play
-        AUX : can
-        DT : a, the
-        ADJ : five-string
-        """
-    f = StringIO(lex)
     lexicon = Lexicon()
-    lexicon.import_lexicon(f)
-    assert lexicon['CAN'] == {'AUX', 'N'}
-    assert lexicon['FIVE-STRING'] == {'ADJ'}
-    assert lexicon.get_tokens('N') == {'CAN', 'PLAY', 'GUITAR'}
+    lexicon.load(StringIO(test_lex))
+    assert lexicon['CAN'] == {Terminal('AUX', 'CAN'), Terminal('N', 'CAN')}
+    assert lexicon['FIVE-STRING'] == {Terminal('ADJ', 'FIVE-STRING')}
 
 
-def test_lexicon_nonzero():
+def test_lexicon_len():
     lexicon = Lexicon()
     assert not lexicon
-    lexicon.add('dog', 'n')
+    lexicon.add(Terminal('n', 'dog'))
     assert lexicon
+    assert len(lexicon) == 1
+    lexicon.add(Terminal('v', 'dog'))
+    lexicon.add(Terminal('n', 'horse'))
+    assert len(lexicon) == 2
 
 
 def test_print_lexicon():
-    lex = """
-        PN : I
-        N : can, play, guitar
-        V : play
-        AUX : can
-        DT : a, the
-        ADJ : five-string
-        """
-    f = StringIO(lex)
     lexicon = Lexicon()
-    lexicon.import_lexicon(f)
+    lexicon.load(StringIO(test_lex))
     answer = [
-        "ADJ : FIVE-STRING",
-        "AUX : CAN",
-        "DT : A, THE",
-        "N : CAN, GUITAR, PLAY",
-        "PN : I",
-        "V : PLAY"]
+        "A : DT",
+        "CAN : AUX",
+        "CAN : N",
+        "FIVE-STRING : ADJ",
+        "GUITAR : N",
+        "I : PN",
+        "PLAY : N",
+        "PLAY : V",
+        "THE : DT"]
     answer = '\n'.join(answer)
+    print(str(lexicon))
     assert str(lexicon) == answer
+
+
+###########
+# GRAMMAR #
+###########
 
 
 def test_grammar_add():
     grammar = Grammar()
-    grammar.add('np --> n')
-    assert grammar['N'] == {Rule('NP', 'N')}
-    grammar.add('vp', ' v np')
-    assert grammar['V'] == {Rule('VP', 'V', 'NP')}
-    grammar.add('NP', 'N', 'Y')
-    assert grammar['N'] == {Rule('NP', 'N'), Rule('NP', 'N', 'Y')}
-    with pytest.raises(ValueError):
-        grammar.add('x')
+    grammar.add(NonTerminal.from_string('np --> n'))
+    assert grammar['N'] == {NonTerminal('NP', 'N')}
+    grammar.add(NonTerminal('vp', 'v', 'np'))
+    assert grammar['V'] == {NonTerminal('VP', 'V', 'NP')}
+    grammar.add(NonTerminal('NP', 'N', 'Y'))
+    assert grammar['N'] == {
+        NonTerminal('NP', 'N'), NonTerminal('NP', 'N', 'Y')}
+
+
+test_gram = """
+    S --> NP VP
+    NP --> DT N
+    NP --> PN
+    VP --> V
+    vp --> v nP
+    """
+
+
+def test_grammar_len():
+    grammar = Grammar()
+    assert not grammar
+    grammar.load(StringIO(test_gram))
+    assert grammar
+    assert len(grammar) == 5
 
 
 def test_grammar_import():
     grammar = Grammar()
-    gram = """
-        S --> NP VP
-        NP --> DT N
-        NP --> PN
-        VP --> V
-        vp --> v nP
-        x
-        y
-        z --> 
-
-        """
-    f = StringIO(gram)
-    grammar.import_grammar(f)
-    assert grammar['NP'] == {Rule('S', 'NP', 'VP')}
-    assert grammar['V'] == {Rule('VP', 'V'), Rule('VP', 'V', 'NP')}
+    grammar.load(StringIO(test_gram))
+    assert grammar['NP'] == {NonTerminal('S', 'NP', 'VP'), }
+    assert grammar['V'] == {
+        NonTerminal('VP', 'V'), NonTerminal('VP', 'V', 'NP')}
+    with pytest.raises(ValueError):
+        grammar.load(StringIO('S NP VP'))
 
 
 def test_grammar_str():
     grammar = Grammar()
-    gram = """
-        S --> NP VP
-        NP --> DT N
-        NP --> PN
-        VP --> V
-        vp --> v nP
-        x
-        y
-        z --> 
-
-        """
-    f = StringIO(gram)
-    grammar.import_grammar(f)
+    grammar.load(StringIO(test_gram))
     answer = [
         "NP --> DT N",
         "NP --> PN",
@@ -258,103 +332,164 @@ def test_grammar_str():
     assert result == answer
 
 
-def test_parser_simple():
-    gram = """
-        S --> NP VP
-        NP --> PN
-        VP --> V
-        """
-    lex = """
-        PN : I
-        V : sleep
-        """
-    parser = InteractiveParser()
-    parser.grammar.import_grammar(StringIO(gram))
-    parser.lexicon.import_lexicon(StringIO(lex))
-    chart = parser._chartparse('i sleep')
-    arcs = [
-        Arc(Rule('S', 'NP', 'VP'), 0, 2, 2),
-        Arc(Rule('NP', 'PN'), 0, 1, 1),
-        Arc(Rule('VP', 'V'), 1, 2, 1),
-        Arc(Rule('PN', 'I'), 0, 1, 1),
-        Arc(Rule('V', 'SLEEP'), 1, 2, 1)]
-    for arc in arcs:
+simple_grammar = Grammar()
+simple_grammar.load(StringIO("""
+    S --> NP VP
+    NP --> PN
+    VP --> V
+    """))
+simple_lexicon = Lexicon()
+simple_lexicon.load(StringIO("""
+    I : PN
+    sleep : V
+    """))
+simple_parser = Parser(simple_grammar, simple_lexicon)
+simple_sentence = ' i   sleep '
+simple_tokens = ['I', 'SLEEP']
+simple_parse = '[.S [.NP [.PN I]][.VP [.V SLEEP]]]'
+simple_chart = [
+    Arc(NonTerminal('S', 'NP', 'VP'), 0, 2, 2),
+    Arc(NonTerminal('NP', 'PN'), 0, 1, 1),
+    Arc(NonTerminal('VP', 'V'), 1, 2, 1),
+    Arc(Terminal('PN', 'I'), 0, 1, 1),
+    Arc(Terminal('V', 'SLEEP'), 1, 2, 1)]
+
+complex_grammar = Grammar()
+complex_grammar.load(StringIO("""
+    S --> NP VP
+    NP --> DT N
+    NP --> DT ADJ N
+    NP --> PN
+    VP --> V
+    VP --> VP NP
+    VP --> AUX VP
+    """))
+complex_lexicon = Lexicon()
+complex_lexicon.load(StringIO("""
+    I : PN
+    little : ADJ
+    can : N
+    play : N
+    guitar : N
+    boy : N
+    can : AUX
+    play : V
+    a : DT
+    the : DT
+    five-string : ADJ
+    """))
+complex_parser = Parser(complex_grammar, complex_lexicon)
+complex_sentence = ' the little boy CAN PLay the    GUiTAR '
+complex_tokens = ['THE', 'LITTLE', 'BOY', 'CAN', 'PLAY', 'THE', 'GUITAR']
+complex_parse = '[.S [.NP [.DT THE][.ADJ LITTLE][.N BOY]][.VP [.AUX CAN][.VP [.VP [.V PLAY]][.NP [.DT THE][.N GUITAR]]]]]'
+complex_chart = [
+    Arc(NonTerminal('S', 'NP', 'VP'), 0, 7, 2),
+    Arc(NonTerminal('NP', 'DT', 'ADJ', 'N'), 0, 3, 3),
+    Arc(Terminal('DT', 'THE'), 0, 1, 1),
+    Arc(Terminal('ADJ', 'LITTLE'), 1, 2, 1),
+    Arc(Terminal('N', 'BOY'), 2, 3, 1),
+    Arc(NonTerminal('VP', 'AUX', 'VP'), 3, 7, 2),
+    Arc(Terminal('AUX', 'CAN'), 3, 4, 1),
+    Arc(Terminal('N', 'CAN'), 3, 4, 1),
+    Arc(NonTerminal('VP', 'VP', 'NP'), 4, 7, 2),
+    Arc(NonTerminal('VP', 'V'), 4, 5, 1),
+    Arc(Terminal('V', 'PLAY'), 4, 5, 1),
+    Arc(Terminal('N', 'PLAY'), 4, 5, 1),
+    Arc(NonTerminal('NP', 'DT', 'N'), 5, 7, 2),
+    Arc(Terminal('DT', 'THE'), 5, 6, 1),
+    Arc(Terminal('N', 'GUITAR'), 6, 7, 1),
+    Arc(NonTerminal('VP', 'AUX', 'VP'), 3, 5, 2),
+    Arc(NonTerminal('S', 'NP', 'VP'), 0, 5, 2)]
+
+
+def test_tokenize():
+    assert Parser.tokenize(simple_sentence) == simple_tokens
+    assert Parser.tokenize(complex_sentence) == complex_tokens
+    assert Parser.tokenize('   ') == []
+
+
+##########
+# AGENDA #
+##########
+
+
+def test_agenda_constr():
+    agenda = Agenda(simple_tokens, simple_lexicon)
+    my_agenda = [
+        Arc(Terminal('PN', 'I'), 0, 1, 1),
+        Arc(Terminal('V', 'SLEEP'), 1, 2, 1)]
+    for arc in my_agenda:
+        assert arc in agenda
+    for arc in agenda:
+        assert arc in my_agenda
+
+
+def test_choose_next():
+    agenda = Agenda(simple_tokens, simple_lexicon)
+    assert agenda.choose_next() == Arc(Terminal('PN', 'I'), 0, 1, 1)
+    assert agenda.choose_next() == Arc(Terminal('V', 'SLEEP'), 1, 2, 1)
+    agenda.agenda.append(Arc(NonTerminal('NP', 'N'), 0, 1, 0))
+    # no completed arcs to select
+    with pytest.raises(ValueError):
+        assert agenda.choose_next()
+
+
+def test_predict():
+    agenda = Agenda(simple_tokens, simple_lexicon)
+    current = agenda.choose_next()
+    assert current == Arc(Terminal('PN', 'I'), 0, 1, 1)
+    agenda.predict(simple_grammar, current)
+    my_agenda = [
+        Arc(Terminal('V', 'SLEEP'), 1, 2, 1),
+        Arc(NonTerminal('NP', 'PN'), 0, 0, 0)]
+    for arc in my_agenda:
+        assert arc in agenda
+    for arc in agenda:
+        assert arc in my_agenda
+
+
+def test_extend():
+    agenda = Agenda(simple_tokens, simple_lexicon)
+    current = agenda.choose_next()
+    assert current == Arc(Terminal('PN', 'I'), 0, 1, 1)
+    agenda.predict(simple_grammar, current)
+    agenda.extend(current)
+    my_agenda = [
+        Arc(Terminal('V', 'SLEEP'), 1, 2, 1),
+        Arc(NonTerminal('NP', 'PN'), 0, 0, 0),
+        Arc(NonTerminal('NP', 'PN'), 0, 1, 1)]
+    for arc in agenda:
+        assert arc in my_agenda
+    for arc in my_agenda:
+        assert arc in agenda
+
+
+#########
+# PARSE #
+#########
+
+
+def test_simple_chartparse():
+    chart = simple_parser._chartparse(*Parser.tokenize(simple_sentence))
+    for arc in simple_chart:
         assert arc in chart
     for arc in chart:
-        assert arc in arcs
-    parse = parser._backtrace(chart)
-    for arc in arcs:
-        assert arc in parse
-    for arc in parse:
-        assert arc in arcs
-    chart = parser._chartparse('i i')
-    assert chart is None
-    parse = parser._backtrace(chart)
-    assert parse is None
+        assert arc in simple_chart
 
 
-# def test_parser_complex():
-#     gram = """
-#         S --> NP VP
-#         NP --> DT N
-#         NP --> DT ADJ N
-#         NP --> PN
-#         VP --> V
-#         VP --> VP NP
-#         VP --> AUX VP
-#         """
-#     lex = """
-#         PN : I
-#         ADJ : little
-#         N : can, play, guitar, boy
-#         V : play
-#         AUX : can
-#         DT : a, the
-#         ADJ : five-string
-#         """
-#     parser = InteractiveParser()
-#     parser.grammar.import_grammar(StringIO(gram))
-#     parser.lexicon.import_lexicon(StringIO(lex))
-#     chart = parser._chartparse('the little boy can play the guitar')
-#                             #  0   1      2   3   4    5   6      7
-#     my_chart = [
-#         Arc(Rule('S', 'NP', 'VP'), 0, 7, 2),
-#         Arc(Rule('NP', 'DT', 'ADJ', 'N'), 0, 3, 3),
-#         Arc(Rule('DT', 'THE'), 0, 1, 1),
-#         Arc(Rule('ADJ', 'LITTLE'), 1, 2, 1),
-#         Arc(Rule('N', 'BOY'), 2, 3, 1),
-#         Arc(Rule('VP', 'AUX', 'VP'), 3, 7, 2),
-#         Arc(Rule('AUX', 'CAN'), 3, 4, 1),
-#         Arc(Rule('N', 'CAN'), 3, 4, 1),
-#         Arc(Rule('VP', 'VP', 'NP'), 4, 7, 2),
-#         Arc(Rule('VP', 'V'), 4, 5, 1),
-#         Arc(Rule('V', 'PLAY'), 4, 5, 1),
-#         Arc(Rule('N', 'PLAY'), 4, 5, 1),
-#         Arc(Rule('NP', 'DT', 'N'), 5, 7, 2),
-#         Arc(Rule('DT', 'THE'), 5, 6, 1),
-#         Arc(Rule('N', 'GUITAR'), 6, 7, 1),
-#         Arc(Rule('VP', 'AUX', 'VP'), 3, 5, 2),
-#         Arc(Rule('S', 'NP', 'VP'), 0, 5, 2)]
-#     for arc in my_chart:
-#         assert arc in chart
-#     for arc in chart:
-#         assert arc in my_chart
-#     my_parse = [
-#         Arc(Rule('S', 'NP', 'VP'), 0, 7, 2),
-#         Arc(Rule('NP', 'DT', 'ADJ', 'N'), 0, 3, 3),
-#         Arc(Rule('DT', 'THE'), 0, 1, 1),
-#         Arc(Rule('ADJ', 'LITTLE'), 1, 2, 1),
-#         Arc(Rule('N', 'BOY'), 2, 3, 1),
-#         Arc(Rule('VP', 'AUX', 'VP'), 3, 7, 2),
-#         Arc(Rule('AUX', 'CAN'), 3, 4, 1),
-#         Arc(Rule('VP', 'VP', 'NP'), 4, 7, 2),
-#         Arc(Rule('VP', 'V'), 4, 5, 1),
-#         Arc(Rule('V', 'PLAY'), 4, 5, 1),
-#         Arc(Rule('NP', 'DT', 'N'), 5, 7, 2),
-#         Arc(Rule('DT', 'THE'), 5, 6, 1),
-#         Arc(Rule('N', 'GUITAR'), 6, 7, 1)]
-#     parse = parser._backtrace(chart)
-#     for arc in my_parse:
-#         assert arc in parse
-#     for arc in parse:
-#         assert arc in my_parse
+def test_simple_parse():
+    assert simple_parser.parse(simple_sentence) == simple_parse
+    with pytest.raises(ValueError):
+        simple_parser.parse('i i')
+
+
+def test_complex_chartparse():
+    chart = complex_parser._chartparse(*Parser.tokenize(complex_sentence))
+    for arc in complex_chart:
+        assert arc in chart
+    for arc in chart:
+        assert arc in complex_chart
+
+
+def test_complex_parse():
+    assert complex_parser.parse(complex_sentence) == complex_parse

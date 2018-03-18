@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-import chartparser.interactive_parser
+import chartparser.gui
 
 
 if __name__ == '__main__':
-    chartparser.interactive_parser.main()
+    chartparser.gui.main()

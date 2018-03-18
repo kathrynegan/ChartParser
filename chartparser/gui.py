@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """
 Kathryn Nichols
 December 12, 2012
@@ -34,7 +36,7 @@ class GUI:
         self.lexicon = Lexicon()
         # self.sentence = StringVar(master=widget)
         # self._sentence = StringVar()
-        self.root.title("Interactive Parser")
+        self.root.title("Interactive Chart Parser")
         self.mainframe = ttk.Frame(self.root, padding='3 3 12 12')
         self.mainframe.grid(column=0, row=0, sticky=(N, W, E, S))
         self.mainframe.columnconfigure(0, weight=1)
@@ -180,7 +182,7 @@ class GUI:
         if not word:
             return
         try:
-            pos = self.lexicon.get_pos(word)
+            pos = self.lexicon[word]
         except KeyError:
             messagebox.showerror('ERROR', '{} not found.'.format(word))
         else:

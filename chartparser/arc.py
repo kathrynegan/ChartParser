@@ -13,18 +13,15 @@ class Arc:
         self.start = start
         self.end = end
         self.dot = dot
-        if history:
-            self.history = history
-        else:
-            self.history = [None] * (len(rule) - 1)
+        self.history = history if history else [None] * (len(rule) - 1)
 
     @property
     def identity(self):
         return id(self)
 
     @property
-    def no_history(self):
-        return self.history.count(None) > 0
+    def is_terminal(self):
+        return self.history == [None] * (len(self.rule) - 1)
 
     def get_extended(self, key):
         if self._nonextendable(key):
@@ -45,11 +42,14 @@ class Arc:
         return self.dot == len(self.rule.children)
 
     def __eq__(self, other):
-        return (
-            self.rule == other.rule and
-            self.start == other.start and
-            self.end == other.end and
-            self.dot == other.dot)
+        try:
+            return (
+                self.rule == other.rule and
+                self.start == other.start and
+                self.end == other.end and
+                self.dot == other.dot)
+        except AttributeError:
+            return False
 
     def __str__(self):
         left = self.rule.parent
