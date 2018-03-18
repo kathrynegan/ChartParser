@@ -93,19 +93,6 @@ class Grammar(Language):
                 output.append(str(rule))
         return '\n'.join(output)
 
-    def trunc(self, n):
-        """ Returns only first n-1 and final rule if there are more than n rules.
-        """
-        output = []
-        for parent in sorted(self._byparent):
-            for rule in sorted(self._byparent[parent]):
-                output.append(str(rule))
-                if len(output) > n - 2:
-                    break
-        output.append('...')
-        output.append(self._byparent[max(self._byparent)])
-        return '\n'.join(output)
-
 
 class Lexicon(Language):
     """ Stores terminal rules in this language. """

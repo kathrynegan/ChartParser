@@ -13,7 +13,7 @@ setup(
         'data/sample_grammar.txt',
         'data/sample_lexicon.txt']},
     description='Chart parser with GUI',
-    long_description=open('README.txt').read(),
+    long_description=open('README.md').read(),
     install_requires=['pytest'],
     license='LICENSE.txt',
 )

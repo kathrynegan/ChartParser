@@ -6,6 +6,8 @@ This limited parser tokenizes words on whitespace and does not strip punctuation
 
 The format of the grammar and lexicon is very specific. Any deviation from this format may cause undesirable or no parses.
 
+For this parser, the parent node "S" represents a sentence.
+
 For more information about the mechanism of chart parsing, please see the original 2012 write-up for this code in docs/, where the original 2012 code (Appendix.txt) can also be found.
 
 ### Grammar
