@@ -7,10 +7,8 @@ parts. Does not text functionality of GUI.
 import pytest
 from io import StringIO
 from chartparser.parser import Parser
-from chartparser.rule_dict import Lexicon
-from chartparser.rule_dict import Grammar
-from chartparser.rule import NonTerminal
-from chartparser.rule import Terminal
+from chartparser.language import Grammar, Lexicon
+from chartparser.rule import Terminal, NonTerminal
 from chartparser.arc import Arc
 from chartparser.chart import Chart
 from chartparser.agenda import Agenda
@@ -45,6 +43,7 @@ def test_nonterminal_const():
 
     assert NonTerminal('S', 'V').is_sentence
     assert not NonTerminal('VP', 'V').is_sentence
+    assert not NonTerminal('VP', 'V').is_terminal
 
 
 def test_nonterminal_eq():
@@ -85,6 +84,7 @@ def test_terminal_const():
     terminal = Terminal.from_string('  The : Dt  ')
     assert terminal.token == 'THE'
     assert terminal.pos == 'DT'
+    assert terminal.is_terminal
 
     with pytest.raises(ValueError):
         Terminal.from_string(': V')
@@ -162,11 +162,6 @@ def test_arc_is_complete():
     assert arc1.is_complete()
     assert not arc2.is_complete()
     assert arc3.is_complete()
-
-
-def test_arc_is_terminal():
-    assert Arc(Terminal('V', 'eat'), 0, 1, 1).is_terminal
-    assert not Arc(NonTerminal('VP', 'V'), 0, 1, 1, [101]).is_terminal
 
 
 def test_arc_eq():

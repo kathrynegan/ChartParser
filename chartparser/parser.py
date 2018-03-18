@@ -3,16 +3,17 @@
 """
 Kathryn Egan
 
-Chart parser provides one parse for given sentence.
+The Parser stores the grammar and lexicon of the language, applies the
+rules in those systems to a given sentence, and returns a single possible parse
+for the sentence if one is found.
 """
-
+from chartparser.language import Grammar, Lexicon
 from chartparser.chart import Chart
 from chartparser.agenda import Agenda
-from chartparser.rule_dict import Grammar
-from chartparser.rule_dict import Lexicon
 
 
-class Parser():
+class Parser:
+
     def __init__(self, grammar=Grammar(), lexicon=Lexicon()):
         """ Initializes parser with grammar and lexicon.
         Args:
@@ -102,7 +103,7 @@ class Parser():
         Returns:
             str : updated parse
         """
-        if arc.is_terminal:
+        if arc.rule.is_terminal:
             return '[.{} {}]'.format(arc.rule.parent, arc.rule.first)
         parse = '[.{} '.format(arc.rule.parent)
         for child in arc.history:
