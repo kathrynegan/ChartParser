@@ -1,10 +1,12 @@
 # ChartParser
 
-ChartParser provides a basic framework and simple user interface for chart parsing sentences as set forth by Kay (1982) and described by Jurafsky (2009). The user can import existing grammars and lexica (an example of each is provided in data/), or create them on the fly.
+ChartParser provides a basic framework and simple user interface for chart parsing sentences as set forth by Kay (1982) and described by Jurafsky (2009). The user can import existing grammars and lexica (an example of each is provided in chartparser/data/), or create them on the fly.
 
 This limited parser tokenizes words on whitespace and does not strip punctuation from the inputted sentence. Only one parse, if any, is provided to the user.
 
-The format of the grammar and lexicon is very specific. Any deviation from this format will break the parser.
+The format of the grammar and lexicon is very specific. Any deviation from this format may cause undesirable or no parses.
+
+For more information about the mechanism of chart parsing, please see the original 2012 write-up for this code in docs/, where the original 2012 code (Appendix.txt) can also be found.
 
 ### Grammar
 Any imported grammar must use the following format to specify a rule, one rule per line:
@@ -27,7 +29,7 @@ The lexical entry must have exactly one word on the left hand side (no compound 
 
 ## Running the tests
 
-Tests can be run by calling pytest from anywhere in the package.
+Tests can be run by calling pytest from anywhere in the package. Tests only evaluate the functionality of the parser and its component parts - the GUI is not evaluated.
 
 ## Versions
 
