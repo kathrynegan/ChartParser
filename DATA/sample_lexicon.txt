@@ -1,9 +1,0 @@
-DT : a, the, my, your, his, her, its, our, their, this, these, that, those, every, some
-N : cat, dog, mouse, man, woman, child, story, cake, house, river, can
-NS : cats, dogs, mice, men, women, children, cakes, houses, rivers, cans
-V : am, are, is, was, were, chase, chases, chased, eat, eats, ate, eaten, love, loves, loved, give, gives, gave, given, tell, tells, told, like, likes, liked
-AUX : can, can't, could, couldn't, may, will, won't, would, wouldn't, should, shouldn't, have, haven't, has, hasn't, had, hadn't, am, are, is, was, were, do, don't, did, didn't
-ADV : not, a lot, really, every day, terribly, yesterday, tomorrow
-P : in, on, by, around, below, above, at, to, under, beside, next to
-ADJ : big, pretty, wonderful, long, tall, little, brown, black, white, blue, green, red, yellow, orange
-PN : I, you, he, she, it, we, they

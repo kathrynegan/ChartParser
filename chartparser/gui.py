@@ -82,9 +82,15 @@ class GUI:
         """ Show given object in window or display error
         if the object is empty. """
         if obj:
-            messagebox.showinfo(obj.name.upper(), str(obj))
+            messagebox.showinfo(obj.name.upper(), self._truncate(str(obj)))
         else:
             messagebox.showerror('ERROR', 'No {}.'.format(obj.name))
+
+    def _truncate(self, string):
+        items = string.split('\n')
+        if len(items) <= 20:
+            return string
+        return '\n'.join(items[:20] + ['...'] + [items[-1]])
 
     def parse_sentence(self):
         """ Parse sentence that is currently in sentence textbox.
@@ -95,17 +101,18 @@ class GUI:
         """
         if not self.sentence:
             return
+        sentence = self.sentence.get()
         parser = Parser(self.grammar, self.lexicon)
         try:
-            parse = parser.parse(self.sentence)
+            parse = parser.parse(sentence)
         except KeyError:
-            messagebox.showerror('ERROR', 'Unknown words.')
+            messagebox.showerror('ERROR', 'Unknown words or punctuation.')
         except IndexError:
             messagebox.showerror('ERROR', 'No grammar.')
         except ValueError:
             messagebox.showerror('ERROR', 'No parse.')
         else:
-            messagebox.showinfo(self.sentence.upper(), parse)
+            messagebox.showinfo(sentence, parse)
 
     def import_lexicon(self):
         """ Import a lexicon. """
@@ -127,7 +134,7 @@ class GUI:
                 obj.load(f)
             except Exception as e:
                 messagebox.showerror(
-                    'ERROR', 'Failed to load\n{}.'.format(obj.name, e))
+                    'ERROR', 'Failed to load{}\n{}.'.format(obj.name, e))
 
     def add_lexical_entry(self):
         """ Prompts user to add a word and part of speech to the lexicon. """

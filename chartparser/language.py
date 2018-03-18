@@ -67,8 +67,12 @@ class Grammar(Language):
         for line in f.readlines():
             if not line.strip():
                 continue
-            rule = NonTerminal.from_string(line)
-            self.add(rule)
+            try:
+                rule = NonTerminal.from_string(line)
+            except ValueError:
+                raise ValueError('Failed on {}.'.format(rule))
+            else:
+                self.add(rule)
 
     def __len__(self):
         """ Returns the number of total rules in this RuleDict.
@@ -87,6 +91,19 @@ class Grammar(Language):
         for parent in sorted(self._byparent):
             for rule in sorted(self._byparent[parent]):
                 output.append(str(rule))
+        return '\n'.join(output)
+
+    def trunc(self, n):
+        """ Returns only first n-1 and final rule if there are more than n rules.
+        """
+        output = []
+        for parent in sorted(self._byparent):
+            for rule in sorted(self._byparent[parent]):
+                output.append(str(rule))
+                if len(output) > n - 2:
+                    break
+        output.append('...')
+        output.append(self._byparent[max(self._byparent)])
         return '\n'.join(output)
 
 
@@ -112,8 +129,12 @@ class Lexicon(Language):
         for line in f.readlines():
             if not line.strip():
                 continue
-            rule = Terminal.from_string(line)
-            self.add(rule)
+            try:
+                rule = Terminal.from_string(line)
+            except ValueError:
+                raise ValueError('Failed on {}.'.format(rule))
+            else:
+                self.add(rule)
 
     def __len__(self):
         """ Returns the number of unique words in this lexicon.
