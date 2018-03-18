@@ -1,6 +1,9 @@
-PN : I
-N : can, play, guitar
-V : play
-AUX : can
-DT : a, the
-ADJ : five-string
+I : PN
+can : N
+play : N
+guitar : N
+play : V
+can : AUX
+a : DT
+the : DT
+five-string : ADJ
