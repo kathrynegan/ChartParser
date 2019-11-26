@@ -5,9 +5,9 @@ Kathryn Egan
 
 Rule is a super class that provides standard functionality for Terminal and
 NonTerminal. Terminal is limited to one parent and one child and is
-essentially a part of the lexicon, or spoken form of langauge. NonTerminal
+essentially a part of the lexicon, or spoken form of language. NonTerminal
 is limited to one parent but may have any number of children as defined
-by the langauge. NonTerminal is the grammar, or unspoken rules of language.
+by the language. NonTerminal is the grammar, or unspoken rules of language.
 """
 
 
